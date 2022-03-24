@@ -1,0 +1,266 @@
+<html>
+  <body>
+    <script>
+      /**
+       * @author Roman Zahradnik <rzfilozof@gmail.com>
+       * 
+       * @summary If you provide any invalid data to the program it will throw an Error (check console)
+       **/
+      const digits = {
+        i: 1,
+        v: 5,
+        x: 10,
+        l: 50,
+        c: 100,
+        d: 500,
+        m: 1000
+      };
+      const exceptionDigits = ['v', 'l', 'd'];
+      const alienDigitMapping = {};
+      const materials = {};
+
+      /**
+       * Parse the correct number from provided digits
+       * 
+       * @param digitsArray string[]
+       * 
+       * @throws Error if any of the roman digits are showing in succession 3 times
+       * @throws Error if the V, L, D digits are in succession
+       * @throws Error if the V, L, D digits are used for substracting
+       * 
+       * @returns number
+       **/
+      const parseValue = (digitsArray) => {
+        let symbol;
+        let successedTimes = 0;
+        let sum = 0;
+        const numbersToSum = [];
+        let skip = false;
+        for (let digitIndex in digitsArray) {
+          const digit = digitsArray[digitIndex];
+          const nextDigit = digitsArray[+digitIndex + 1];
+
+          if (skip) {
+            skip = false;
+            continue;
+          }
+
+          if (symbol !== digit) {
+            symbol = digit;
+            successedTimes = 1;
+          } else if (successedTimes === 3) {
+            throw Error('Cannot repeat more than 3 times in succession');
+          } else if (exceptionDigits.includes(digit) && successedTimes >= 1) {
+            throw Error('Digits V, L, D can never be repeated');
+          } else {
+            successedTimes += 1;
+          }
+
+          if (nextDigit && digits[digit] < digits[nextDigit]) {
+            if (exceptionDigits.includes(digit)) {
+              throw Error('Digits V, L, D can never be substracted');
+            }
+            sum += digits[nextDigit] - digits[digit];
+            skip = true;
+          } else {
+            sum += digits[digit]
+          }
+        }
+
+        return sum;
+      }
+
+      /**
+       * Test function for parseValue
+       * 
+       * @throws Error if any of the test cases fail
+       * 
+       * @returns void
+       **/
+      const testParseValue = () => {
+        const testCases = [
+          // positive cases
+          ['i', 1],
+          ['ii', 2],
+          ['iii', 3],
+          ['iv', 4],
+          ['v', 5],
+          ['vi', 6],
+          ['vii', 7],
+          ['viii', 8],
+          ['ix', 9],
+          ['x', 10],
+          ['mmvi', 2006],
+          ['mcmxliv', 1944],
+          // exception cases
+          ['iiii', null],
+          ['vv', null],
+          ['xxxx', null],
+          ['ll', null],
+          ['cccc', null],
+          ['dd', null],
+          ['mmmm', null],
+          ['vx', null],
+          ['vl', null],
+          ['vc', null],
+          ['vd', null],
+          ['vm', null],
+          ['lc', null],
+          ['ld', null],
+          ['lm', null],
+          ['dm', null],
+        ];
+
+        for (let testCase of testCases) {
+          let testReturn;
+
+          if (testCase[1] !== null) {
+            if (parseValue(testCase[0].split('')) !== testCase[1]) {
+              throw Error('parseValue test failed: argument ' + testCase.join(' expected '))
+            }
+          } else {
+            let testPassed = false;
+            try {
+              testReturn = parseValue(testCase[0].split(''))
+            } catch (e) {
+              testPassed = true;
+            }
+
+            if (!testPassed) {
+              throw Error(`parseValue test failed: argument ${testCase[0]} expected exception got ${testReturn}`);
+            }
+          }
+        }
+      }
+
+      /**
+       * Translate alien digits to roman digits 
+       * 
+       * @param alienNumberString string
+       * 
+       * @throws Error if the digits was not parsed from input beforehand
+       * 
+       * @returns string roman digits without spaces
+       **/
+      const buildDigitsFromAlienLang = alienNumberString => {
+        let digitsString = '';
+
+        for (let alienDigit of alienNumberString.split(' ')) {
+          if (alienDigitMapping[alienDigit]) {
+            digitsString += alienDigitMapping[alienDigit];
+          } else {
+            throw Error('Unknown alien digit');
+          }
+        }
+
+        return digitsString;
+      };
+
+      /**
+       * Parse line from the input
+       * 
+       * @param line string
+       * 
+       * @throws Error if the digit from input does not belong to any official roman digit
+       * @throws Error if the material was not parsed from input beforehand
+       * 
+       * @returns string line that should be displayed on output
+       **/
+      const parseLine = line => {
+        let lineToReturn = '';
+        const words = line.split(' ');
+
+        if (words.length === 3 && words[1] === 'is') {
+          const romanDigit = words[2].toLowerCase();
+  
+          if (!digits[romanDigit]) {
+            throw Error("Invalid roman digit!");
+          }
+
+          alienDigitMapping[words[0]] = romanDigit;
+        }
+
+        else if (words[words.length - 1] === 'credits') {
+          const creditsValue = +words[words.length - 2];
+          const materialIndex = words.length - 4;
+          const materialName = words[materialIndex].toLowerCase();
+          const alienNumberArray = words.slice(0, materialIndex);
+          const romanDigits = buildDigitsFromAlienLang(alienNumberArray.join(' '));
+          const alienDigitsValue = parseValue(romanDigits.split(''));
+
+          materials[materialName] = creditsValue / alienDigitsValue
+        }
+
+        else if (words[words.length - 1] === '?' && line.toLowerCase().startsWith('how many credits is')) {
+          const lineParsed = line.replace(/how many Credits is (.*(?=\s))\ *\?$/gi, '\$1');
+          const lineParsedArray = lineParsed.split(' ');
+          const material = lineParsedArray.pop();
+          const romanDigits = buildDigitsFromAlienLang(lineParsedArray.join(' '));
+
+          if (!materials[material]) {
+            throw Error('Unknown material');
+          }
+          const creditValue = parseValue(romanDigits.split('')) * materials[material];
+
+          lineToReturn = `${lineParsed} is ${creditValue} Credits`;
+        }
+
+        else if (words[words.length - 1] === '?' && line.toLowerCase().startsWith('how much is')) {
+          const lineParsed = line.replace(/how much is (.*(?=\s))\ *\?$/gi, '\$1').trim();
+          const romanDigits = buildDigitsFromAlienLang(lineParsed);
+          const creditValue = parseValue(romanDigits.split(''));
+
+          lineToReturn = `${lineParsed} is ${creditValue} Credits`;
+        }
+
+        else {
+          lineToReturn = 'I have no idea what you are talking about';
+        }
+
+        return lineToReturn;
+      }
+
+      /**
+       * Parse input and renders the output by modifying the DOM directly
+       * 
+       * @returns void
+       **/
+      const parseInput = () => {
+        const inputElement = document.getElementById('input');
+        const lines = inputElement.value.split('\n');
+        const linesToOutput = [];
+
+        for (let line of lines) {
+          const lineToOutput = parseLine(line.trim().toLowerCase());
+          if (lineToOutput) {
+            linesToOutput.push(lineToOutput)
+          }
+        }
+        document.getElementById('output').innerHTML = linesToOutput.join('<br>');
+      }
+    </script>
+    <h1>Input</h5>
+    <textarea id="input" cols="75" rows="15">
+glob is I
+prok is V
+pish is X
+tegj is L
+rofl is C
+lmao is D
+lol is M
+glob glob Silver is 34 Credits
+glob prok Gold is 57800 Credits
+pish pish Iron is 3910 Credits
+how much is pish tegj glob glob ?
+how much is lol lmao rofl ?
+how many Credits is glob prok Silver ?
+how many Credits is glob prok Gold ?
+how many Credits is glob prok Iron ?
+how much wood could a woodchuck chuck if a woodchuck could chuck wood ?</textarea>
+    <br>
+    <br>
+    <button id="submit" onclick="parseInput()">Translate</button>
+    <h1>Output</h5>
+    <p id="output"></p>
+  </body>
+</html>
